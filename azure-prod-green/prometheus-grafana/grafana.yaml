@@ -1,6 +1,6 @@
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: ServiceAccount
 metadata:
   labels:
     app: grafana
@@ -9,115 +9,6 @@ metadata:
     release: grafana
   name: grafana
   namespace: grafana
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: grafana
-      release: grafana
-  strategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      annotations:
-        checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
-        checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
-        checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/secret: 8011f77d55f7c8bac5b57a2d2cd5f33a59c9ea78477e6fd25e39f066a2697fde
-      labels:
-        app: grafana
-        release: grafana
-    spec:
-      containers:
-      - env:
-        - name: GF_SECURITY_ADMIN_USER
-          valueFrom:
-            secretKeyRef:
-              key: admin-user
-              name: grafana
-        - name: GF_SECURITY_ADMIN_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: admin-password
-              name: grafana
-        image: grafana/grafana:6.4.2
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          failureThreshold: 10
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 60
-          timeoutSeconds: 30
-        name: grafana
-        ports:
-        - containerPort: 80
-          name: service
-          protocol: TCP
-        - containerPort: 3000
-          name: grafana
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-        resources: {}
-        volumeMounts:
-        - mountPath: /etc/grafana/grafana.ini
-          name: config
-          subPath: grafana.ini
-        - mountPath: /var/lib/grafana
-          name: storage
-        - mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
-          name: config
-          subPath: datasources.yaml
-        - mountPath: /etc/grafana/provisioning/dashboards/dashboardproviders.yaml
-          name: config
-          subPath: dashboardproviders.yaml
-      initContainers:
-      - command:
-        - chown
-        - -R
-        - 472:472
-        - /var/lib/grafana
-        image: busybox:1.30
-        imagePullPolicy: IfNotPresent
-        name: init-chown-data
-        resources: {}
-        securityContext:
-          runAsUser: 0
-        volumeMounts:
-        - mountPath: /var/lib/grafana
-          name: storage
-      - args:
-        - -c
-        - mkdir -p /var/lib/grafana/dashboards/default && /bin/sh /etc/grafana/download_dashboards.sh
-        command:
-        - /bin/sh
-        env: null
-        image: appropriate/curl:latest
-        imagePullPolicy: IfNotPresent
-        name: download-dashboards
-        volumeMounts:
-        - mountPath: /etc/grafana/download_dashboards.sh
-          name: config
-          subPath: download_dashboards.sh
-        - mountPath: /var/lib/grafana
-          name: storage
-      securityContext:
-        fsGroup: 472
-        runAsUser: 472
-      serviceAccountName: grafana
-      volumes:
-      - configMap:
-          name: grafana
-        name: config
-      - configMap:
-          name: grafana-dashboards-default
-        name: dashboards-default
-      - name: storage
-        persistentVolumeClaim:
-          claimName: grafana
 
 ---
 apiVersion: policy/v1beta1
@@ -206,7 +97,7 @@ spec:
 ---
 apiVersion: v1
 data:
-  admin-password: MHlieUN4eTA4QmdLUEUybEtHTXN6bndPWUZJWnBFMWFrNThzWmFidQ==
+  admin-password: eFVRYVl2cGQyOUYzMDB0YU9QdnVVQ05kUlRXUGFtSkRoQ2V4ajNybg==
   admin-user: YWRtaW4=
   ldap-toml: ""
 kind: Secret
@@ -315,6 +206,127 @@ metadata:
   namespace: grafana
 
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+      release: grafana
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
+        checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
+        checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+        checksum/secret: 91c28c3d9b99f065b3659df2d26fc6b174db5857ccb20ea8feee0fc265598baf
+      labels:
+        app: grafana
+        release: grafana
+    spec:
+      containers:
+      - env:
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: admin-user
+              name: grafana
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: admin-password
+              name: grafana
+        image: grafana/grafana:6.4.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 10
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+        name: grafana
+        ports:
+        - containerPort: 80
+          name: service
+          protocol: TCP
+        - containerPort: 3000
+          name: grafana
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/grafana/grafana.ini
+          name: config
+          subPath: grafana.ini
+        - mountPath: /var/lib/grafana
+          name: storage
+        - mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+          name: config
+          subPath: datasources.yaml
+        - mountPath: /etc/grafana/provisioning/dashboards/dashboardproviders.yaml
+          name: config
+          subPath: dashboardproviders.yaml
+      initContainers:
+      - command:
+        - chown
+        - -R
+        - 472:472
+        - /var/lib/grafana
+        image: busybox:1.30
+        imagePullPolicy: IfNotPresent
+        name: init-chown-data
+        resources: {}
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: storage
+      - args:
+        - -c
+        - mkdir -p /var/lib/grafana/dashboards/default && /bin/sh /etc/grafana/download_dashboards.sh
+        command:
+        - /bin/sh
+        env: null
+        image: appropriate/curl:latest
+        imagePullPolicy: IfNotPresent
+        name: download-dashboards
+        volumeMounts:
+        - mountPath: /etc/grafana/download_dashboards.sh
+          name: config
+          subPath: download_dashboards.sh
+        - mountPath: /var/lib/grafana
+          name: storage
+      securityContext:
+        fsGroup: 472
+        runAsUser: 472
+      serviceAccountName: grafana
+      volumes:
+      - configMap:
+          name: grafana
+        name: config
+      - configMap:
+          name: grafana-dashboards-default
+        name: dashboards-default
+      - name: storage
+        persistentVolumeClaim:
+          claimName: grafana
+
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -334,72 +346,6 @@ spec:
     requests:
       storage: 4Gi
   storageClassName: managed-premium
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: Role
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - grafana
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-rules:
-- apiGroups:
-  - policy
-  resourceNames:
-  - grafana-test
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -423,16 +369,23 @@ subjects:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: RoleBinding
 metadata:
   labels:
     app: grafana
     chart: grafana-4.0.1
     heritage: Tiller
     release: grafana
-  name: grafana-clusterrole
+  name: grafana-test
   namespace: grafana
-rules: []
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana-test
+subjects:
+- kind: ServiceAccount
+  name: grafana-test
+  namespace: grafana
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -475,6 +428,73 @@ spec:
     app: grafana
     release: grafana
   type: ClusterIP
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+rules:
+- apiGroups:
+  - extensions
+  resourceNames:
+  - grafana
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - grafana-test
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-clusterrole
+  namespace: grafana
+rules: []
 
 ---
 apiVersion: v1
@@ -524,24 +544,4 @@ spec:
     name: tests
   - emptyDir: {}
     name: tools
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: grafana-test
-subjects:
-- kind: ServiceAccount
-  name: grafana-test
-  namespace: grafana
 

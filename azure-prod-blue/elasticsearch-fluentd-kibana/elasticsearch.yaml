@@ -5,10 +5,28 @@ metadata:
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
-    component: data
+    component: client
     heritage: Tiller
     release: elasticsearch
-  name: elasticsearch-data
+  name: elasticsearch-client
+  namespace: elasticsearch
+
+---
+apiVersion: v1
+data:
+  run.sh: |-
+    @test "Test Access and Health" {
+      curl -D - http://elasticsearch-client:9200
+      curl -D - http://elasticsearch-client:9200/_cluster/health?wait_for_status=green
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-test
   namespace: elasticsearch
 
 ---
@@ -97,37 +115,6 @@ metadata:
 
 ---
 apiVersion: v1
-data:
-  run.sh: |-
-    @test "Test Access and Health" {
-      curl -D - http://elasticsearch-client:9200
-      curl -D - http://elasticsearch-client:9200/_cluster/health?wait_for_status=green
-    }
-kind: ConfigMap
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-test
-  namespace: elasticsearch
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    component: client
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-client
-  namespace: elasticsearch
-
----
-apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -147,6 +134,19 @@ spec:
     app: elasticsearch
     component: master
     release: elasticsearch
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    component: data
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-data
+  namespace: elasticsearch
 
 ---
 apiVersion: v1
@@ -186,31 +186,31 @@ spec:
 
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
-    component: client
+    component: master
     heritage: Tiller
     release: elasticsearch
-  name: elasticsearch-client
+  name: elasticsearch-master
   namespace: elasticsearch
 spec:
-  replicas: 2
+  podManagementPolicy: OrderedReady
+  replicas: 3
   selector:
     matchLabels:
       app: elasticsearch
-      component: client
       release: elasticsearch
+  serviceName: elasticsearch-master
   template:
     metadata:
-      annotations:
-        checksum/config: 5610d8f27f99a33f60458e66c377ae0899bc86cc612312974a58daa73f8741d5
       labels:
         app: elasticsearch
-        component: client
+        component: master
         release: elasticsearch
+        role: master
     spec:
       affinity:
         podAntiAffinity:
@@ -219,15 +219,13 @@ spec:
               labelSelector:
                 matchLabels:
                   app: elasticsearch
-                  component: client
+                  component: master
                   release: elasticsearch
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
       - env:
         - name: NODE_DATA
-          value: "false"
-        - name: NODE_MASTER
           value: "false"
         - name: DISCOVERY_SERVICE
           value: elasticsearch-discovery
@@ -241,30 +239,24 @@ spec:
           value: "2"
         image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.2
         imagePullPolicy: IfNotPresent
-        livenessProbe:
-          httpGet:
-            path: /_cluster/health?local=true
-            port: 9200
-          initialDelaySeconds: 90
         name: elasticsearch
         ports:
-        - containerPort: 9200
-          name: http
         - containerPort: 9300
           name: transport
         readinessProbe:
           httpGet:
-            path: /_cluster/health
+            path: /_cluster/health?local=true
             port: 9200
           initialDelaySeconds: 5
         resources:
           limits:
             cpu: "1"
-            memory: 2048Mi
           requests:
             cpu: 25m
             memory: 512Mi
         volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: data
         - mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
           name: config
           subPath: elasticsearch.yml
@@ -279,13 +271,43 @@ spec:
         resources: {}
         securityContext:
           privileged: true
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          set -e; set -x; chown elasticsearch:elasticsearch /usr/share/elasticsearch/data; for datadir in $(find /usr/share/elasticsearch/data -mindepth 1 -maxdepth 1 -not -name ".snapshot"); do
+            chown -R elasticsearch:elasticsearch $datadir;
+          done; chown elasticsearch:elasticsearch /usr/share/elasticsearch/logs; for logfile in $(find /usr/share/elasticsearch/logs -mindepth 1 -maxdepth 1 -not -name ".snapshot"); do
+            chown -R elasticsearch:elasticsearch $logfile;
+          done
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.2
+        imagePullPolicy: IfNotPresent
+        name: chown
+        resources: {}
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: data
       securityContext:
         fsGroup: 1000
-      serviceAccountName: elasticsearch-client
+      serviceAccountName: elasticsearch-master
       volumes:
       - configMap:
           name: elasticsearch
         name: config
+  updateStrategy:
+    type: OnDelete
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 4Gi
+      storageClassName: managed-premium
 
 ---
 apiVersion: v1
@@ -480,31 +502,31 @@ spec:
 
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
-    component: master
+    component: client
     heritage: Tiller
     release: elasticsearch
-  name: elasticsearch-master
+  name: elasticsearch-client
   namespace: elasticsearch
 spec:
-  podManagementPolicy: OrderedReady
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: elasticsearch
+      component: client
       release: elasticsearch
-  serviceName: elasticsearch-master
   template:
     metadata:
+      annotations:
+        checksum/config: 5610d8f27f99a33f60458e66c377ae0899bc86cc612312974a58daa73f8741d5
       labels:
         app: elasticsearch
-        component: master
+        component: client
         release: elasticsearch
-        role: master
     spec:
       affinity:
         podAntiAffinity:
@@ -513,13 +535,15 @@ spec:
               labelSelector:
                 matchLabels:
                   app: elasticsearch
-                  component: master
+                  component: client
                   release: elasticsearch
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
       - env:
         - name: NODE_DATA
+          value: "false"
+        - name: NODE_MASTER
           value: "false"
         - name: DISCOVERY_SERVICE
           value: elasticsearch-discovery
@@ -533,24 +557,30 @@ spec:
           value: "2"
         image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.2
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: 9200
+          initialDelaySeconds: 90
         name: elasticsearch
         ports:
+        - containerPort: 9200
+          name: http
         - containerPort: 9300
           name: transport
         readinessProbe:
           httpGet:
-            path: /_cluster/health?local=true
+            path: /_cluster/health
             port: 9200
           initialDelaySeconds: 5
         resources:
           limits:
             cpu: "1"
+            memory: 2048Mi
           requests:
             cpu: 25m
             memory: 512Mi
         volumeMounts:
-        - mountPath: /usr/share/elasticsearch/data
-          name: data
         - mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
           name: config
           subPath: elasticsearch.yml
@@ -565,41 +595,11 @@ spec:
         resources: {}
         securityContext:
           privileged: true
-      - command:
-        - /bin/bash
-        - -c
-        - |
-          set -e; set -x; chown elasticsearch:elasticsearch /usr/share/elasticsearch/data; for datadir in $(find /usr/share/elasticsearch/data -mindepth 1 -maxdepth 1 -not -name ".snapshot"); do
-            chown -R elasticsearch:elasticsearch $datadir;
-          done; chown elasticsearch:elasticsearch /usr/share/elasticsearch/logs; for logfile in $(find /usr/share/elasticsearch/logs -mindepth 1 -maxdepth 1 -not -name ".snapshot"); do
-            chown -R elasticsearch:elasticsearch $logfile;
-          done
-        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.2
-        imagePullPolicy: IfNotPresent
-        name: chown
-        resources: {}
-        securityContext:
-          runAsUser: 0
-        volumeMounts:
-        - mountPath: /usr/share/elasticsearch/data
-          name: data
       securityContext:
         fsGroup: 1000
-      serviceAccountName: elasticsearch-master
+      serviceAccountName: elasticsearch-client
       volumes:
       - configMap:
           name: elasticsearch
         name: config
-  updateStrategy:
-    type: OnDelete
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 4Gi
-      storageClassName: managed-premium
 

@@ -102,6 +102,20 @@ spec:
 
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+
+---
+apiVersion: v1
 data:
   containers.input.conf: |-
     # This configuration file for Fluentd / td-agent is used
@@ -522,20 +536,6 @@ roleRef:
   name: fluentd-elasticsearch
 subjects:
 - kind: ServiceAccount
-  name: fluentd-elasticsearch
-  namespace: fluentd
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
   name: fluentd-elasticsearch
   namespace: fluentd
 

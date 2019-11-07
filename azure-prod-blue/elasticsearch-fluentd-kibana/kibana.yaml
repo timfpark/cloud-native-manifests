@@ -1,4 +1,51 @@
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kibana
+    chart: kibana-3.2.4
+    heritage: Tiller
+    release: kibana
+  name: kibana
+  namespace: kibana
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: kibana
+      release: kibana
+  template:
+    metadata:
+      annotations:
+        checksum/config: 3a6c2f8152381fbfc8779d5a95f84e6c62ea7ac5fe0031bf13e47d2639316744
+      labels:
+        app: kibana
+        release: kibana
+    spec:
+      containers:
+      - env: null
+        image: docker.elastic.co/kibana/kibana-oss:6.7.0
+        imagePullPolicy: IfNotPresent
+        name: kibana
+        ports:
+        - containerPort: 5601
+          name: kibana
+          protocol: TCP
+        resources: {}
+        volumeMounts:
+        - mountPath: /usr/share/kibana/config/kibana.yml
+          name: kibana
+          subPath: kibana.yml
+      serviceAccountName: default
+      tolerations: []
+      volumes:
+      - configMap:
+          name: kibana
+        name: kibana
+
+---
 apiVersion: v1
 data:
   kibana.yml: |
@@ -48,53 +95,6 @@ metadata:
     release: kibana
   name: kibana-test
   namespace: kibana
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: kibana
-    chart: kibana-3.2.4
-    heritage: Tiller
-    release: kibana
-  name: kibana
-  namespace: kibana
-spec:
-  replicas: 1
-  revisionHistoryLimit: 3
-  selector:
-    matchLabels:
-      app: kibana
-      release: kibana
-  template:
-    metadata:
-      annotations:
-        checksum/config: 3a6c2f8152381fbfc8779d5a95f84e6c62ea7ac5fe0031bf13e47d2639316744
-      labels:
-        app: kibana
-        release: kibana
-    spec:
-      containers:
-      - env: null
-        image: docker.elastic.co/kibana/kibana-oss:6.7.0
-        imagePullPolicy: IfNotPresent
-        name: kibana
-        ports:
-        - containerPort: 5601
-          name: kibana
-          protocol: TCP
-        resources: {}
-        volumeMounts:
-        - mountPath: /usr/share/kibana/config/kibana.yml
-          name: kibana
-          subPath: kibana.yml
-      serviceAccountName: default
-      tolerations: []
-      volumes:
-      - configMap:
-          name: kibana
-        name: kibana
 
 ---
 apiVersion: v1

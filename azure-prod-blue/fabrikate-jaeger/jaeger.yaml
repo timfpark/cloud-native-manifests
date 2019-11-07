@@ -1,4 +1,38 @@
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cassandra
+    chart: cassandra-0.13.3
+    heritage: Tiller
+    release: jaeger
+  name: jaeger-cassandra
+  namespace: jaeger
+spec:
+  clusterIP: None
+  ports:
+  - name: intra
+    port: 7000
+    targetPort: 7000
+  - name: tls
+    port: 7001
+    targetPort: 7001
+  - name: jmx
+    port: 7199
+    targetPort: 7199
+  - name: cql
+    port: 9042
+    targetPort: 9042
+  - name: thrift
+    port: 9160
+    targetPort: 9160
+  selector:
+    app: cassandra
+    release: jaeger
+  type: ClusterIP
+
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -70,6 +104,42 @@ metadata:
 
 ---
 apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: jaeger
+    helm.sh/chart: jaeger-0.13.3
+  name: jaeger-agent
+  namespace: jaeger
+spec:
+  ports:
+  - name: zipkin-compact
+    port: 5775
+    protocol: UDP
+    targetPort: zipkin-compact
+  - name: jaeger-compact
+    port: 6831
+    protocol: UDP
+    targetPort: jaeger-compact
+  - name: jaeger-binary
+    port: 6832
+    protocol: UDP
+    targetPort: jaeger-binary
+  - name: http
+    port: 5778
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/name: jaeger
+  type: ClusterIP
+
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
@@ -112,76 +182,6 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: cassandra
-    chart: cassandra-0.13.3
-    heritage: Tiller
-    release: jaeger
-  name: jaeger-cassandra
-  namespace: jaeger
-spec:
-  clusterIP: None
-  ports:
-  - name: intra
-    port: 7000
-    targetPort: 7000
-  - name: tls
-    port: 7001
-    targetPort: 7001
-  - name: jmx
-    port: 7199
-    targetPort: 7199
-  - name: cql
-    port: 9042
-    targetPort: 9042
-  - name: thrift
-    port: 9160
-    targetPort: 9160
-  selector:
-    app: cassandra
-    release: jaeger
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app.kubernetes.io/component: agent
-    app.kubernetes.io/instance: jaeger
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: jaeger
-    helm.sh/chart: jaeger-0.13.3
-  name: jaeger-agent
-  namespace: jaeger
-spec:
-  ports:
-  - name: zipkin-compact
-    port: 5775
-    protocol: UDP
-    targetPort: zipkin-compact
-  - name: jaeger-compact
-    port: 6831
-    protocol: UDP
-    targetPort: jaeger-compact
-  - name: jaeger-binary
-    port: 6832
-    protocol: UDP
-    targetPort: jaeger-binary
-  - name: http
-    port: 5778
-    protocol: TCP
-    targetPort: http
-  selector:
-    app.kubernetes.io/component: agent
-    app.kubernetes.io/instance: jaeger
-    app.kubernetes.io/name: jaeger
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
     app.kubernetes.io/component: collector
     app.kubernetes.io/instance: jaeger
     app.kubernetes.io/managed-by: Tiller
@@ -212,91 +212,6 @@ spec:
     app.kubernetes.io/instance: jaeger
     app.kubernetes.io/name: jaeger
   type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app.kubernetes.io/component: query
-    app.kubernetes.io/instance: jaeger
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: jaeger
-    helm.sh/chart: jaeger-0.13.3
-  name: jaeger-query
-  namespace: jaeger
-spec:
-  ports:
-  - name: query
-    port: 80
-    protocol: TCP
-    targetPort: query
-  selector:
-    app.kubernetes.io/component: query
-    app.kubernetes.io/instance: jaeger
-    app.kubernetes.io/name: jaeger
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  labels:
-    app.kubernetes.io/component: agent
-    app.kubernetes.io/instance: jaeger
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: jaeger
-    helm.sh/chart: jaeger-0.13.3
-  name: jaeger-agent
-  namespace: jaeger
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/component: agent
-      app.kubernetes.io/instance: jaeger
-      app.kubernetes.io/name: jaeger
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/component: agent
-        app.kubernetes.io/instance: jaeger
-        app.kubernetes.io/name: jaeger
-    spec:
-      containers:
-      - env:
-        - name: REPORTER_GRPC_HOST_PORT
-          value: jaeger-collector:14250
-        image: jaegertracing/jaeger-agent:1.14.0
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          httpGet:
-            path: /
-            port: admin
-        name: jaeger-agent
-        ports:
-        - containerPort: 5775
-          name: zipkin-compact
-          protocol: UDP
-        - containerPort: 6831
-          name: jaeger-compact
-          protocol: UDP
-        - containerPort: 6832
-          name: jaeger-binary
-          protocol: UDP
-        - containerPort: 5778
-          name: http
-          protocol: TCP
-        - containerPort: 14271
-          name: admin
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: /
-            port: admin
-        resources: {}
-      dnsPolicy: ClusterFirst
-      nodeSelector: {}
-      serviceAccountName: jaeger-agent
 
 ---
 apiVersion: apps/v1
@@ -470,6 +385,91 @@ spec:
       restartPolicy: Always
       serviceAccountName: jaeger-query
       volumes: null
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: query
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: jaeger
+    helm.sh/chart: jaeger-0.13.3
+  name: jaeger-query
+  namespace: jaeger
+spec:
+  ports:
+  - name: query
+    port: 80
+    protocol: TCP
+    targetPort: query
+  selector:
+    app.kubernetes.io/component: query
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/name: jaeger
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: jaeger
+    helm.sh/chart: jaeger-0.13.3
+  name: jaeger-agent
+  namespace: jaeger
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: agent
+      app.kubernetes.io/instance: jaeger
+      app.kubernetes.io/name: jaeger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/instance: jaeger
+        app.kubernetes.io/name: jaeger
+    spec:
+      containers:
+      - env:
+        - name: REPORTER_GRPC_HOST_PORT
+          value: jaeger-collector:14250
+        image: jaegertracing/jaeger-agent:1.14.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /
+            port: admin
+        name: jaeger-agent
+        ports:
+        - containerPort: 5775
+          name: zipkin-compact
+          protocol: UDP
+        - containerPort: 6831
+          name: jaeger-compact
+          protocol: UDP
+        - containerPort: 6832
+          name: jaeger-binary
+          protocol: UDP
+        - containerPort: 5778
+          name: http
+          protocol: TCP
+        - containerPort: 14271
+          name: admin
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /
+            port: admin
+        resources: {}
+      dnsPolicy: ClusterFirst
+      nodeSelector: {}
+      serviceAccountName: jaeger-agent
 
 ---
 apiVersion: apps/v1
