@@ -5,100 +5,11 @@ metadata:
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
-    component: data
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-data
-  namespace: elasticsearch
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    component: master
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-discovery
-  namespace: elasticsearch
-spec:
-  clusterIP: None
-  ports:
-  - port: 9300
-    targetPort: transport
-  selector:
-    app: elasticsearch
-    component: master
-    release: elasticsearch
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
     component: master
     heritage: Tiller
     release: elasticsearch
   name: elasticsearch-master
   namespace: elasticsearch
-
----
-apiVersion: v1
-data:
-  run.sh: |-
-    @test "Test Access and Health" {
-      curl -D - http://elasticsearch-client:9200
-      curl -D - http://elasticsearch-client:9200/_cluster/health?wait_for_status=green
-    }
-kind: ConfigMap
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-test
-  namespace: elasticsearch
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    component: client
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-client
-  namespace: elasticsearch
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    component: client
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-client
-  namespace: elasticsearch
-spec:
-  ports:
-  - name: http
-    port: 9200
-    targetPort: http
-  selector:
-    app: elasticsearch
-    component: client
-    release: elasticsearch
-  type: ClusterIP
 
 ---
 apiVersion: v1
@@ -186,10 +97,14 @@ metadata:
 
 ---
 apiVersion: v1
-kind: Pod
+data:
+  run.sh: |-
+    @test "Test Access and Health" {
+      curl -D - http://elasticsearch-client:9200
+      curl -D - http://elasticsearch-client:9200/_cluster/health?wait_for_status=green
+    }
+kind: ConfigMap
 metadata:
-  annotations:
-    helm.sh/hook: test-success
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
@@ -197,40 +112,32 @@ metadata:
     release: elasticsearch
   name: elasticsearch-test
   namespace: elasticsearch
-spec:
-  containers:
-  - command:
-    - /tools/bats/bats
-    - -t
-    - /tests/run.sh
-    image: dduportal/bats:0.4.0
-    name: elasticsearch-test
-    volumeMounts:
-    - mountPath: /tests
-      name: tests
-      readOnly: true
-    - mountPath: /tools
-      name: tools
-  initContainers:
-  - command:
-    - bash
-    - -c
-    - |
-      set -ex
-      # copy bats to tools dir
-      cp -R /usr/local/libexec/ /tools/bats/
-    image: dduportal/bats:0.4.0
-    name: test-framework
-    volumeMounts:
-    - mountPath: /tools
-      name: tools
-  restartPolicy: Never
-  volumes:
-  - configMap:
-      name: elasticsearch-test
-    name: tests
-  - emptyDir: {}
-    name: tools
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    component: client
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-client
+  namespace: elasticsearch
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    component: data
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-data
+  namespace: elasticsearch
 
 ---
 apiVersion: apps/v1
@@ -356,6 +263,99 @@ spec:
         requests:
           storage: 4Gi
       storageClassName: managed-premium
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    component: client
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-client
+  namespace: elasticsearch
+spec:
+  ports:
+  - name: http
+    port: 9200
+    targetPort: http
+  selector:
+    app: elasticsearch
+    component: client
+    release: elasticsearch
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    component: master
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-discovery
+  namespace: elasticsearch
+spec:
+  clusterIP: None
+  ports:
+  - port: 9300
+    targetPort: transport
+  selector:
+    app: elasticsearch
+    component: master
+    release: elasticsearch
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    helm.sh/hook: test-success
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-test
+  namespace: elasticsearch
+spec:
+  containers:
+  - command:
+    - /tools/bats/bats
+    - -t
+    - /tests/run.sh
+    image: dduportal/bats:0.4.0
+    name: elasticsearch-test
+    volumeMounts:
+    - mountPath: /tests
+      name: tests
+      readOnly: true
+    - mountPath: /tools
+      name: tools
+  initContainers:
+  - command:
+    - bash
+    - -c
+    - |
+      set -ex
+      # copy bats to tools dir
+      cp -R /usr/local/libexec/ /tools/bats/
+    image: dduportal/bats:0.4.0
+    name: test-framework
+    volumeMounts:
+    - mountPath: /tools
+      name: tools
+  restartPolicy: Never
+  volumes:
+  - configMap:
+      name: elasticsearch-test
+    name: tests
+  - emptyDir: {}
+    name: tools
 
 ---
 apiVersion: apps/v1

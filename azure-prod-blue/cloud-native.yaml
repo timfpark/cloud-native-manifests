@@ -1,20 +1,4 @@
 ---
-# setup an elasticsearch with `make es`
-apiVersion: jaegertracing.io/v1
-kind: Jaeger
-metadata:
-  name: jaeger
-spec:
-  strategy: production
-  storage:
-    type: elasticsearch
-    options:
-      es:
-        server-urls: http://elasticsearch-client.elasticsearch.svc.cluster.local:9200
-        username: elastic
-        password: changeme
-
----
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:

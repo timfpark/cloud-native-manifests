@@ -15,7 +15,7 @@ metadata:
   name: kured
   labels:
     app: kured
-    chart: kured-1.4.0
+    chart: kured-1.4.1
     release: kured
     heritage: Tiller
 rules:
@@ -49,7 +49,7 @@ metadata:
   name: kured
   labels:
     app: kured
-    chart: kured-1.4.0
+    chart: kured-1.4.1
     release: kured
     heritage: Tiller
 roleRef:
@@ -70,7 +70,7 @@ metadata:
   name: kured
   labels:
     app: kured
-    chart: kured-1.4.0
+    chart: kured-1.4.1
     release: kured
     heritage: Tiller
 rules:
@@ -93,7 +93,7 @@ metadata:
   name: kured
   labels:
     app: kured
-    chart: kured-1.4.0
+    chart: kured-1.4.1
     release: kured
     heritage: Tiller
 subjects:
@@ -114,7 +114,7 @@ metadata:
   namespace: kube-system
   labels:
     app: kured
-    chart: kured-1.4.0
+    chart: kured-1.4.1
     release: kured
     heritage: Tiller
 spec:
