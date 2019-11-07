@@ -391,6 +391,88 @@ spec:
 
 ---
 apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    sidecar.istio.io/inject: "false"
+  labels:
+    app.kubernetes.io/component: collector
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: jaeger
+    helm.sh/chart: jaeger-0.13.3
+  name: jaeger-collector
+  namespace: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: collector
+      app.kubernetes.io/instance: jaeger
+      app.kubernetes.io/name: jaeger
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: collector
+        app.kubernetes.io/instance: jaeger
+        app.kubernetes.io/name: jaeger
+    spec:
+      containers:
+      - env:
+        - name: SPAN_STORAGE_TYPE
+          value: cassandra
+        - name: CASSANDRA_SERVERS
+          value: jaeger-cassandra
+        - name: CASSANDRA_PORT
+          value: "9042"
+        - name: CASSANDRA_KEYSPACE
+          value: jaeger_v1_dc1
+        - name: CASSANDRA_USERNAME
+          value: user
+        - name: CASSANDRA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: jaeger-cassandra
+        image: jaegertracing/jaeger-collector:1.14.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /
+            port: admin
+        name: jaeger-collector
+        ports:
+        - containerPort: 14250
+          name: grpc
+          protocol: TCP
+        - containerPort: 14267
+          name: tchannel
+          protocol: TCP
+        - containerPort: 14268
+          name: http
+          protocol: TCP
+        - containerPort: 14269
+          name: admin
+          protocol: TCP
+        - containerPort: 9411
+          name: zipkin
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /
+            port: admin
+        resources: {}
+        volumeMounts: null
+      dnsPolicy: ClusterFirst
+      nodeSelector: {}
+      restartPolicy: Always
+      serviceAccountName: jaeger-collector
+      volumes: null
+
+---
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   labels:
@@ -490,86 +572,4 @@ spec:
         name: data
   updateStrategy:
     type: OnDelete
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  annotations:
-    sidecar.istio.io/inject: "false"
-  labels:
-    app.kubernetes.io/component: collector
-    app.kubernetes.io/instance: jaeger
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: jaeger
-    helm.sh/chart: jaeger-0.13.3
-  name: jaeger-collector
-  namespace: jaeger
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/component: collector
-      app.kubernetes.io/instance: jaeger
-      app.kubernetes.io/name: jaeger
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/component: collector
-        app.kubernetes.io/instance: jaeger
-        app.kubernetes.io/name: jaeger
-    spec:
-      containers:
-      - env:
-        - name: SPAN_STORAGE_TYPE
-          value: cassandra
-        - name: CASSANDRA_SERVERS
-          value: jaeger-cassandra
-        - name: CASSANDRA_PORT
-          value: "9042"
-        - name: CASSANDRA_KEYSPACE
-          value: jaeger_v1_dc1
-        - name: CASSANDRA_USERNAME
-          value: user
-        - name: CASSANDRA_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: password
-              name: jaeger-cassandra
-        image: jaegertracing/jaeger-collector:1.14.0
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          httpGet:
-            path: /
-            port: admin
-        name: jaeger-collector
-        ports:
-        - containerPort: 14250
-          name: grpc
-          protocol: TCP
-        - containerPort: 14267
-          name: tchannel
-          protocol: TCP
-        - containerPort: 14268
-          name: http
-          protocol: TCP
-        - containerPort: 14269
-          name: admin
-          protocol: TCP
-        - containerPort: 9411
-          name: zipkin
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: /
-            port: admin
-        resources: {}
-        volumeMounts: null
-      dnsPolicy: ClusterFirst
-      nodeSelector: {}
-      restartPolicy: Always
-      serviceAccountName: jaeger-collector
-      volumes: null
 

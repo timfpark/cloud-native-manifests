@@ -1,9 +1,7 @@
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  finalizers:
-  - kubernetes.io/pvc-protection
   labels:
     app: grafana
     chart: grafana-4.0.1
@@ -12,12 +10,114 @@ metadata:
   name: grafana
   namespace: grafana
 spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  storageClassName: managed-premium
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+      release: grafana
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
+        checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
+        checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+        checksum/secret: 64678cf6a53a21ef877be0752889a276f5af6f99123fd93044d239cc6766cc24
+      labels:
+        app: grafana
+        release: grafana
+    spec:
+      containers:
+      - env:
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: admin-user
+              name: grafana
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: admin-password
+              name: grafana
+        image: grafana/grafana:6.4.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 10
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+        name: grafana
+        ports:
+        - containerPort: 80
+          name: service
+          protocol: TCP
+        - containerPort: 3000
+          name: grafana
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/grafana/grafana.ini
+          name: config
+          subPath: grafana.ini
+        - mountPath: /var/lib/grafana
+          name: storage
+        - mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+          name: config
+          subPath: datasources.yaml
+        - mountPath: /etc/grafana/provisioning/dashboards/dashboardproviders.yaml
+          name: config
+          subPath: dashboardproviders.yaml
+      initContainers:
+      - command:
+        - chown
+        - -R
+        - 472:472
+        - /var/lib/grafana
+        image: busybox:1.30
+        imagePullPolicy: IfNotPresent
+        name: init-chown-data
+        resources: {}
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: storage
+      - args:
+        - -c
+        - mkdir -p /var/lib/grafana/dashboards/default && /bin/sh /etc/grafana/download_dashboards.sh
+        command:
+        - /bin/sh
+        env: null
+        image: appropriate/curl:latest
+        imagePullPolicy: IfNotPresent
+        name: download-dashboards
+        volumeMounts:
+        - mountPath: /etc/grafana/download_dashboards.sh
+          name: config
+          subPath: download_dashboards.sh
+        - mountPath: /var/lib/grafana
+          name: storage
+      securityContext:
+        fsGroup: 472
+        runAsUser: 472
+      serviceAccountName: grafana
+      volumes:
+      - configMap:
+          name: grafana
+        name: config
+      - configMap:
+          name: grafana-dashboards-default
+        name: dashboards-default
+      - name: storage
+        persistentVolumeClaim:
+          claimName: grafana
 
 ---
 apiVersion: policy/v1beta1
@@ -106,7 +206,7 @@ spec:
 ---
 apiVersion: v1
 data:
-  admin-password: Z0s3TzBuSFNTWXJ3MWR6ZGxhTlhxbzNNTmhTVDk0YlltYW9OQ2Jqcw==
+  admin-password: T21hTzMzeVM1eEV4eVNzRmQ0Ykl1Sk9qRU0yVkcxZWVxRXFqQ012Yw==
   admin-user: YWRtaW4=
   ldap-toml: ""
 kind: Secret
@@ -215,24 +315,25 @@ metadata:
   namespace: grafana
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
   labels:
     app: grafana
     chart: grafana-4.0.1
     heritage: Tiller
     release: grafana
-  name: grafana-clusterrolebinding
-  namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: grafana-clusterrole
-subjects:
-- kind: ServiceAccount
   name: grafana
   namespace: grafana
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: managed-premium
 
 ---
 apiVersion: v1
@@ -273,24 +374,23 @@ rules: []
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRoleBinding
 metadata:
   labels:
     app: grafana
     chart: grafana-4.0.1
     heritage: Tiller
     release: grafana
-  name: grafana-test
+  name: grafana-clusterrolebinding
   namespace: grafana
-rules:
-- apiGroups:
-  - policy
-  resourceNames:
-  - grafana-test
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: grafana-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: grafana
+  namespace: grafana
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -308,6 +408,27 @@ rules:
   - extensions
   resourceNames:
   - grafana
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - grafana-test
   resources:
   - podsecuritypolicies
   verbs:
@@ -423,125 +544,4 @@ spec:
     name: tests
   - emptyDir: {}
     name: tools
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: grafana
-      release: grafana
-  strategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      annotations:
-        checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
-        checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
-        checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/secret: 817586d74ccb8684733cd0e1e78c7ebde8d29a5f6195870bd5281badd3493809
-      labels:
-        app: grafana
-        release: grafana
-    spec:
-      containers:
-      - env:
-        - name: GF_SECURITY_ADMIN_USER
-          valueFrom:
-            secretKeyRef:
-              key: admin-user
-              name: grafana
-        - name: GF_SECURITY_ADMIN_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: admin-password
-              name: grafana
-        image: grafana/grafana:6.4.2
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          failureThreshold: 10
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 60
-          timeoutSeconds: 30
-        name: grafana
-        ports:
-        - containerPort: 80
-          name: service
-          protocol: TCP
-        - containerPort: 3000
-          name: grafana
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-        resources: {}
-        volumeMounts:
-        - mountPath: /etc/grafana/grafana.ini
-          name: config
-          subPath: grafana.ini
-        - mountPath: /var/lib/grafana
-          name: storage
-        - mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
-          name: config
-          subPath: datasources.yaml
-        - mountPath: /etc/grafana/provisioning/dashboards/dashboardproviders.yaml
-          name: config
-          subPath: dashboardproviders.yaml
-      initContainers:
-      - command:
-        - chown
-        - -R
-        - 472:472
-        - /var/lib/grafana
-        image: busybox:1.30
-        imagePullPolicy: IfNotPresent
-        name: init-chown-data
-        resources: {}
-        securityContext:
-          runAsUser: 0
-        volumeMounts:
-        - mountPath: /var/lib/grafana
-          name: storage
-      - args:
-        - -c
-        - mkdir -p /var/lib/grafana/dashboards/default && /bin/sh /etc/grafana/download_dashboards.sh
-        command:
-        - /bin/sh
-        env: null
-        image: appropriate/curl:latest
-        imagePullPolicy: IfNotPresent
-        name: download-dashboards
-        volumeMounts:
-        - mountPath: /etc/grafana/download_dashboards.sh
-          name: config
-          subPath: download_dashboards.sh
-        - mountPath: /var/lib/grafana
-          name: storage
-      securityContext:
-        fsGroup: 472
-        runAsUser: 472
-      serviceAccountName: grafana
-      volumes:
-      - configMap:
-          name: grafana
-        name: config
-      - configMap:
-          name: grafana-dashboards-default
-        name: dashboards-default
-      - name: storage
-        persistentVolumeClaim:
-          claimName: grafana
 

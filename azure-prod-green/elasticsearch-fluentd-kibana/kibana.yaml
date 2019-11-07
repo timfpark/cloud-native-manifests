@@ -1,39 +1,6 @@
 ---
 apiVersion: v1
 data:
-  run.sh: |-
-    @test "Test Status" {
-      url="http://kibana:443/api/status"
-
-      # retry for 1 minute
-      run curl -s -o /dev/null -I -w "%{http_code}" --retry 30 --retry-delay 2 $url
-
-      code=$(curl -s -o /dev/null -I -w "%{http_code}" $url)
-      body=$(curl $url)
-      if [ "$code" == "503" ]
-      then
-        skip "Kibana Unavailable (503), can't get status - see pod logs: $body"
-      fi
-
-      result=$(echo $body | jq -cr '.status.statuses[]')
-      [ "$result" != "" ]
-
-      result=$(echo $body | jq -cr '.status.statuses[] | select(.state != "green")')
-      [ "$result" == "" ]
-    }
-kind: ConfigMap
-metadata:
-  labels:
-    app: kibana
-    chart: kibana-3.2.4
-    heritage: Tiller
-    release: kibana
-  name: kibana-test
-  namespace: kibana
-
----
-apiVersion: v1
-data:
   kibana.yml: |
     elasticsearch.hosts: http://elasticsearch:9200
     elasticsearch.url: http://elasticsearch-client.elasticsearch.svc.cluster.local:9200
@@ -116,6 +83,39 @@ spec:
     app: kibana
     release: kibana
   type: ClusterIP
+
+---
+apiVersion: v1
+data:
+  run.sh: |-
+    @test "Test Status" {
+      url="http://kibana:443/api/status"
+
+      # retry for 1 minute
+      run curl -s -o /dev/null -I -w "%{http_code}" --retry 30 --retry-delay 2 $url
+
+      code=$(curl -s -o /dev/null -I -w "%{http_code}" $url)
+      body=$(curl $url)
+      if [ "$code" == "503" ]
+      then
+        skip "Kibana Unavailable (503), can't get status - see pod logs: $body"
+      fi
+
+      result=$(echo $body | jq -cr '.status.statuses[]')
+      [ "$result" != "" ]
+
+      result=$(echo $body | jq -cr '.status.statuses[] | select(.state != "green")')
+      [ "$result" == "" ]
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: kibana
+    chart: kibana-3.2.4
+    heritage: Tiller
+    release: kibana
+  name: kibana-test
+  namespace: kibana
 
 ---
 apiVersion: v1

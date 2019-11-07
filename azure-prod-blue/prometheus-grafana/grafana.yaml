@@ -23,7 +23,7 @@ spec:
         checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
         checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
         checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/secret: ee331f50a61bdd03c8cc563f389bf8e1ef4aa18fc0590ff18dde2513b8ec1932
+        checksum/secret: d8849e56c60460cd535ad2afcf1dc196c6830ab4db97540a83c3e72ece4fac2d
       labels:
         app: grafana
         release: grafana
@@ -206,7 +206,7 @@ spec:
 ---
 apiVersion: v1
 data:
-  admin-password: OHNSbjN4OERQR1ZUQ0JlVkVWbjRHbTlFM1RhRzFVNnNoR21YcDY4cQ==
+  admin-password: UGJJdjhuRlNmSzFqTzM5emxuZnZLaWt2ZGF3VWs1V2pNWU95WVN3eQ==
   admin-user: YWRtaW4=
   ldap-toml: ""
 kind: Secret
@@ -315,9 +315,11 @@ metadata:
   namespace: grafana
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: Role
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
   labels:
     app: grafana
     chart: grafana-4.0.1
@@ -325,15 +327,13 @@ metadata:
     release: grafana
   name: grafana
   namespace: grafana
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - grafana
+spec:
+  accessModes:
+  - ReadWriteOnce
   resources:
-  - podsecuritypolicies
-  verbs:
-  - use
+    requests:
+      storage: 4Gi
+  storageClassName: managed-premium
 
 ---
 apiVersion: v1
@@ -393,24 +393,25 @@ subjects:
   namespace: grafana
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
 metadata:
   labels:
     app: grafana
     chart: grafana-4.0.1
     heritage: Tiller
     release: grafana
-  name: grafana-test
+  name: grafana
   namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: grafana-test
-subjects:
-- kind: ServiceAccount
-  name: grafana-test
-  namespace: grafana
+rules:
+- apiGroups:
+  - extensions
+  resourceNames:
+  - grafana
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -454,25 +455,24 @@ subjects:
   namespace: grafana
 
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
 metadata:
-  finalizers:
-  - kubernetes.io/pvc-protection
   labels:
     app: grafana
     chart: grafana-4.0.1
     heritage: Tiller
     release: grafana
-  name: grafana
+  name: grafana-test
   namespace: grafana
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  storageClassName: managed-premium
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana-test
+subjects:
+- kind: ServiceAccount
+  name: grafana-test
+  namespace: grafana
 
 ---
 apiVersion: v1
