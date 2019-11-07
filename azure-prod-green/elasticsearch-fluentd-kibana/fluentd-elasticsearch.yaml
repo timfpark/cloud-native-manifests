@@ -1,120 +1,4 @@
 ---
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
-  name: fluentd-elasticsearch
-  namespace: fluentd
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: fluentd-elasticsearch
-      app.kubernetes.io/name: fluentd-elasticsearch
-  template:
-    metadata:
-      annotations:
-        checksum/config: 1f9bd8f6f1fc6b8f084a9aa1e4300505634d3f7a724d86f360c3f2df3ff522d9
-        scheduler.alpha.kubernetes.io/critical-pod: ""
-      labels:
-        app.kubernetes.io/instance: fluentd-elasticsearch
-        app.kubernetes.io/managed-by: Tiller
-        app.kubernetes.io/name: fluentd-elasticsearch
-        helm.sh/chart: fluentd-elasticsearch-2.0.7
-        kubernetes.io/cluster-service: "true"
-    spec:
-      containers:
-      - env:
-        - name: FLUENTD_ARGS
-          value: --no-supervisor -q
-        - name: OUTPUT_HOST
-          value: elasticsearch-client.elasticsearch.svc.cluster.local
-        - name: OUTPUT_PORT
-          value: "9200"
-        - name: LOGSTASH_PREFIX
-          value: logstash
-        - name: OUTPUT_SCHEME
-          value: http
-        - name: OUTPUT_SSL_VERSION
-          value: TLSv1_2
-        - name: OUTPUT_BUFFER_CHUNK_LIMIT
-          value: 2M
-        - name: OUTPUT_BUFFER_QUEUE_LIMIT
-          value: "8"
-        - name: K8S_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        image: gcr.io/google-containers/fluentd-elasticsearch:v2.3.2
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - |
-              LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300}; STUCK_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-900}; if [ ! -e /var/log/fluentd-buffers ]; then
-                exit 1;
-              fi; touch -d "${STUCK_THRESHOLD_SECONDS} seconds ago" /tmp/marker-stuck; if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-stuck -print -quit)" ]]; then
-                rm -rf /var/log/fluentd-buffers;
-                exit 1;
-              fi; touch -d "${LIVENESS_THRESHOLD_SECONDS} seconds ago" /tmp/marker-liveness; if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-liveness -print -quit)" ]]; then
-                exit 1;
-              fi;
-          initialDelaySeconds: 600
-          periodSeconds: 60
-        name: fluentd-elasticsearch
-        ports: null
-        resources: {}
-        volumeMounts:
-        - mountPath: /var/log
-          name: varlog
-        - mountPath: /var/lib/docker/containers
-          name: varlibdockercontainers
-          readOnly: true
-        - mountPath: /host/lib
-          name: libsystemddir
-          readOnly: true
-        - mountPath: /etc/fluent/config.d
-          name: config-volume
-      serviceAccountName: fluentd-elasticsearch
-      terminationGracePeriodSeconds: 30
-      volumes:
-      - hostPath:
-          path: /var/log
-        name: varlog
-      - hostPath:
-          path: /var/lib/docker/containers
-        name: varlibdockercontainers
-      - hostPath:
-          path: /usr/lib64
-        name: libsystemddir
-      - configMap:
-          name: fluentd-elasticsearch
-        name: config-volume
-  updateStrategy:
-    type: RollingUpdate
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
-  name: fluentd-elasticsearch
-  namespace: fluentd
-
----
 apiVersion: v1
 data:
   containers.input.conf: |-
@@ -519,28 +403,6 @@ metadata:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
-  name: fluentd-elasticsearch
-  namespace: fluentd
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: fluentd-elasticsearch
-subjects:
-- kind: ServiceAccount
-  name: fluentd-elasticsearch
-  namespace: fluentd
-
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
@@ -562,4 +424,142 @@ rules:
   - get
   - watch
   - list
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentd-elasticsearch
+subjects:
+- kind: ServiceAccount
+  name: fluentd-elasticsearch
+  namespace: fluentd
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: fluentd-elasticsearch
+      app.kubernetes.io/name: fluentd-elasticsearch
+  template:
+    metadata:
+      annotations:
+        checksum/config: 1f9bd8f6f1fc6b8f084a9aa1e4300505634d3f7a724d86f360c3f2df3ff522d9
+        scheduler.alpha.kubernetes.io/critical-pod: ""
+      labels:
+        app.kubernetes.io/instance: fluentd-elasticsearch
+        app.kubernetes.io/managed-by: Tiller
+        app.kubernetes.io/name: fluentd-elasticsearch
+        helm.sh/chart: fluentd-elasticsearch-2.0.7
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - env:
+        - name: FLUENTD_ARGS
+          value: --no-supervisor -q
+        - name: OUTPUT_HOST
+          value: elasticsearch-client.elasticsearch.svc.cluster.local
+        - name: OUTPUT_PORT
+          value: "9200"
+        - name: LOGSTASH_PREFIX
+          value: logstash
+        - name: OUTPUT_SCHEME
+          value: http
+        - name: OUTPUT_SSL_VERSION
+          value: TLSv1_2
+        - name: OUTPUT_BUFFER_CHUNK_LIMIT
+          value: 2M
+        - name: OUTPUT_BUFFER_QUEUE_LIMIT
+          value: "8"
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        image: gcr.io/google-containers/fluentd-elasticsearch:v2.3.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300}; STUCK_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-900}; if [ ! -e /var/log/fluentd-buffers ]; then
+                exit 1;
+              fi; touch -d "${STUCK_THRESHOLD_SECONDS} seconds ago" /tmp/marker-stuck; if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-stuck -print -quit)" ]]; then
+                rm -rf /var/log/fluentd-buffers;
+                exit 1;
+              fi; touch -d "${LIVENESS_THRESHOLD_SECONDS} seconds ago" /tmp/marker-liveness; if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-liveness -print -quit)" ]]; then
+                exit 1;
+              fi;
+          initialDelaySeconds: 600
+          periodSeconds: 60
+        name: fluentd-elasticsearch
+        ports: null
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/log
+          name: varlog
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /host/lib
+          name: libsystemddir
+          readOnly: true
+        - mountPath: /etc/fluent/config.d
+          name: config-volume
+      serviceAccountName: fluentd-elasticsearch
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - hostPath:
+          path: /usr/lib64
+        name: libsystemddir
+      - configMap:
+          name: fluentd-elasticsearch
+        name: config-volume
+  updateStrategy:
+    type: RollingUpdate
 

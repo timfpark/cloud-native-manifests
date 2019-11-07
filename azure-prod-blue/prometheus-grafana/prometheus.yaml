@@ -36,339 +36,6 @@ metadata:
   namespace: prometheus
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: server
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-server
-  namespace: prometheus
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  - nodes/proxy
-  - nodes/metrics
-  - services
-  - endpoints
-  - pods
-  - ingresses
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - extensions
-  resources:
-  - ingresses/status
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: prometheus-alertmanager
-subjects:
-- kind: ServiceAccount
-  name: prometheus-alertmanager
-  namespace: prometheus
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: kube-state-metrics
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-kube-state-metrics
-  namespace: prometheus
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: prometheus-kube-state-metrics
-subjects:
-- kind: ServiceAccount
-  name: prometheus-kube-state-metrics
-  namespace: prometheus
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: pushgateway
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-pushgateway
-  namespace: prometheus
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: prometheus-pushgateway
-subjects:
-- kind: ServiceAccount
-  name: prometheus-pushgateway
-  namespace: prometheus
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: server
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-server
-  namespace: prometheus
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: prometheus-server
-subjects:
-- kind: ServiceAccount
-  name: prometheus-server
-  namespace: prometheus
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-spec:
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 9093
-  selector:
-    app: prometheus
-    component: alertmanager
-    release: prometheus
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    prometheus.io/scrape: "true"
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: kube-state-metrics
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-kube-state-metrics
-  namespace: prometheus
-spec:
-  clusterIP: None
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 8080
-  selector:
-    app: prometheus
-    component: kube-state-metrics
-    release: prometheus
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    prometheus.io/scrape: "true"
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: node-exporter
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-node-exporter
-  namespace: prometheus
-spec:
-  clusterIP: None
-  ports:
-  - name: metrics
-    port: 9100
-    protocol: TCP
-    targetPort: 9100
-  selector:
-    app: prometheus
-    component: node-exporter
-    release: prometheus
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    prometheus.io/probe: pushgateway
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: pushgateway
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-pushgateway
-  namespace: prometheus
-spec:
-  ports:
-  - name: http
-    port: 9091
-    protocol: TCP
-    targetPort: 9091
-  selector:
-    app: prometheus
-    component: pushgateway
-    release: prometheus
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: server
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-server
-  namespace: prometheus
-spec:
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 9090
-  selector:
-    app: prometheus
-    component: server
-    release: prometheus
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: node-exporter
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-node-exporter
-  namespace: prometheus
-spec:
-  selector:
-    matchLabels:
-      app: prometheus
-      component: node-exporter
-      release: prometheus
-  template:
-    metadata:
-      labels:
-        app: prometheus
-        chart: prometheus-9.3.1
-        component: node-exporter
-        heritage: Tiller
-        release: prometheus
-    spec:
-      containers:
-      - args:
-        - --path.procfs=/host/proc
-        - --path.sysfs=/host/sys
-        image: prom/node-exporter:v0.18.0
-        imagePullPolicy: IfNotPresent
-        name: prometheus-node-exporter
-        ports:
-        - containerPort: 9100
-          hostPort: 9100
-          name: metrics
-        resources: {}
-        volumeMounts:
-        - mountPath: /host/proc
-          name: proc
-          readOnly: true
-        - mountPath: /host/sys
-          name: sys
-          readOnly: true
-      hostNetwork: true
-      hostPID: true
-      serviceAccountName: prometheus-node-exporter
-      volumes:
-      - hostPath:
-          path: /proc
-        name: proc
-      - hostPath:
-          path: /sys
-        name: sys
-  updateStrategy:
-    type: RollingUpdate
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  storageClassName: managed-premium
-
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -548,6 +215,26 @@ rules:
   verbs:
   - list
   - watch
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: alertmanager
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-alertmanager
+  namespace: prometheus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: managed-premium
 
 ---
 apiVersion: apps/v1
@@ -1606,8 +1293,98 @@ metadata:
   namespace: prometheus
 
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: node-exporter
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-node-exporter
+  namespace: prometheus
+spec:
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 9100
+    protocol: TCP
+    targetPort: 9100
+  selector:
+    app: prometheus
+    component: node-exporter
+    release: prometheus
+  type: ClusterIP
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: server
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-server
+  namespace: prometheus
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - nodes/proxy
+  - nodes/metrics
+  - services
+  - endpoints
+  - pods
+  - ingresses
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses/status
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: alertmanager
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-alertmanager
+  namespace: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-alertmanager
+subjects:
+- kind: ServiceAccount
+  name: prometheus-alertmanager
+  namespace: prometheus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
 metadata:
   labels:
     app: prometheus
@@ -1617,34 +1394,107 @@ metadata:
     release: prometheus
   name: prometheus-kube-state-metrics
   namespace: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-kube-state-metrics
+subjects:
+- kind: ServiceAccount
+  name: prometheus-kube-state-metrics
+  namespace: prometheus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: pushgateway
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-pushgateway
+  namespace: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-pushgateway
+subjects:
+- kind: ServiceAccount
+  name: prometheus-pushgateway
+  namespace: prometheus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: server
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-server
+  namespace: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-server
+subjects:
+- kind: ServiceAccount
+  name: prometheus-server
+  namespace: prometheus
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: alertmanager
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-alertmanager
+  namespace: prometheus
 spec:
-  replicas: 1
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 9093
   selector:
-    matchLabels:
-      app: prometheus
-      component: kube-state-metrics
-      release: prometheus
-  template:
-    metadata:
-      labels:
-        app: prometheus
-        chart: prometheus-9.3.1
-        component: kube-state-metrics
-        heritage: Tiller
-        release: prometheus
-    spec:
-      containers:
-      - image: quay.io/coreos/kube-state-metrics:v1.6.0
-        imagePullPolicy: IfNotPresent
-        name: prometheus-kube-state-metrics
-        ports:
-        - containerPort: 8080
-          name: metrics
-        resources: {}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-      serviceAccountName: prometheus-kube-state-metrics
+    app: prometheus
+    component: alertmanager
+    release: prometheus
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: kube-state-metrics
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-kube-state-metrics
+  namespace: prometheus
+spec:
+  clusterIP: None
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: prometheus
+    component: kube-state-metrics
+    release: prometheus
+  type: ClusterIP
 
 ---
 apiVersion: apps/v1
@@ -1730,6 +1580,115 @@ spec:
           claimName: prometheus-alertmanager
 
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/probe: pushgateway
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: pushgateway
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-pushgateway
+  namespace: prometheus
+spec:
+  ports:
+  - name: http
+    port: 9091
+    protocol: TCP
+    targetPort: 9091
+  selector:
+    app: prometheus
+    component: pushgateway
+    release: prometheus
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: server
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-server
+  namespace: prometheus
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prometheus
+    component: server
+    release: prometheus
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: node-exporter
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-node-exporter
+  namespace: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+      component: node-exporter
+      release: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        chart: prometheus-9.3.1
+        component: node-exporter
+        heritage: Tiller
+        release: prometheus
+    spec:
+      containers:
+      - args:
+        - --path.procfs=/host/proc
+        - --path.sysfs=/host/sys
+        image: prom/node-exporter:v0.18.0
+        imagePullPolicy: IfNotPresent
+        name: prometheus-node-exporter
+        ports:
+        - containerPort: 9100
+          hostPort: 9100
+          name: metrics
+        resources: {}
+        volumeMounts:
+        - mountPath: /host/proc
+          name: proc
+          readOnly: true
+        - mountPath: /host/sys
+          name: sys
+          readOnly: true
+      hostNetwork: true
+      hostPID: true
+      serviceAccountName: prometheus-node-exporter
+      volumes:
+      - hostPath:
+          path: /proc
+        name: proc
+      - hostPath:
+          path: /sys
+        name: sys
+  updateStrategy:
+    type: RollingUpdate
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1775,4 +1734,45 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
       serviceAccountName: prometheus-pushgateway
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: kube-state-metrics
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-kube-state-metrics
+  namespace: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+      component: kube-state-metrics
+      release: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        chart: prometheus-9.3.1
+        component: kube-state-metrics
+        heritage: Tiller
+        release: prometheus
+    spec:
+      containers:
+      - image: quay.io/coreos/kube-state-metrics:v1.6.0
+        imagePullPolicy: IfNotPresent
+        name: prometheus-kube-state-metrics
+        ports:
+        - containerPort: 8080
+          name: metrics
+        resources: {}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: prometheus-kube-state-metrics
 

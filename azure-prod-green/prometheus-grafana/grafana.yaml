@@ -1,7 +1,9 @@
 ---
 apiVersion: v1
-kind: ServiceAccount
+kind: PersistentVolumeClaim
 metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
   labels:
     app: grafana
     chart: grafana-4.0.1
@@ -9,6 +11,13 @@ metadata:
     release: grafana
   name: grafana
   namespace: grafana
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: managed-premium
 
 ---
 apiVersion: policy/v1beta1
@@ -97,7 +106,7 @@ spec:
 ---
 apiVersion: v1
 data:
-  admin-password: eFVRYVl2cGQyOUYzMDB0YU9QdnVVQ05kUlRXUGFtSkRoQ2V4ajNybg==
+  admin-password: Z0s3TzBuSFNTWXJ3MWR6ZGxhTlhxbzNNTmhTVDk0YlltYW9OQ2Jqcw==
   admin-user: YWRtaW4=
   ldap-toml: ""
 kind: Secret
@@ -206,6 +215,216 @@ metadata:
   namespace: grafana
 
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-clusterrolebinding
+  namespace: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: grafana-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: grafana
+  namespace: grafana
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-clusterrole
+  namespace: grafana
+rules: []
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - grafana-test
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+rules:
+- apiGroups:
+  - extensions
+  resourceNames:
+  - grafana
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana
+subjects:
+- kind: ServiceAccount
+  name: grafana
+  namespace: grafana
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana-test
+subjects:
+- kind: ServiceAccount
+  name: grafana-test
+  namespace: grafana
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+spec:
+  ports:
+  - name: service
+    port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: grafana
+    release: grafana
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    helm.sh/hook: test-success
+  labels:
+    app: grafana
+    chart: grafana-4.0.1
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+spec:
+  containers:
+  - command:
+    - /tools/bats/bats
+    - -t
+    - /tests/run.sh
+    image: dduportal/bats:0.4.0
+    name: grafana-test
+    volumeMounts:
+    - mountPath: /tests
+      name: tests
+      readOnly: true
+    - mountPath: /tools
+      name: tools
+  initContainers:
+  - command:
+    - bash
+    - -c
+    - |
+      set -ex
+      # copy bats to tools dir
+      cp -R /usr/local/libexec/ /tools/bats/
+    image: dduportal/bats:0.4.0
+    name: test-framework
+    volumeMounts:
+    - mountPath: /tools
+      name: tools
+  restartPolicy: Never
+  serviceAccountName: grafana-test
+  volumes:
+  - configMap:
+      name: grafana-test
+    name: tests
+  - emptyDir: {}
+    name: tools
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -230,7 +449,7 @@ spec:
         checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
         checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
         checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/secret: 91c28c3d9b99f065b3659df2d26fc6b174db5857ccb20ea8feee0fc265598baf
+        checksum/secret: 817586d74ccb8684733cd0e1e78c7ebde8d29a5f6195870bd5281badd3493809
       labels:
         app: grafana
         release: grafana
@@ -325,223 +544,4 @@ spec:
       - name: storage
         persistentVolumeClaim:
           claimName: grafana
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  finalizers:
-  - kubernetes.io/pvc-protection
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  storageClassName: managed-premium
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: RoleBinding
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: grafana
-subjects:
-- kind: ServiceAccount
-  name: grafana
-  namespace: grafana
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: grafana-test
-subjects:
-- kind: ServiceAccount
-  name: grafana-test
-  namespace: grafana
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-clusterrolebinding
-  namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: grafana-clusterrole
-subjects:
-- kind: ServiceAccount
-  name: grafana
-  namespace: grafana
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-spec:
-  ports:
-  - name: service
-    port: 80
-    protocol: TCP
-    targetPort: 3000
-  selector:
-    app: grafana
-    release: grafana
-  type: ClusterIP
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: Role
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - grafana
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-rules:
-- apiGroups:
-  - policy
-  resourceNames:
-  - grafana-test
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-clusterrole
-  namespace: grafana
-rules: []
-
----
-apiVersion: v1
-kind: Pod
-metadata:
-  annotations:
-    helm.sh/hook: test-success
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-spec:
-  containers:
-  - command:
-    - /tools/bats/bats
-    - -t
-    - /tests/run.sh
-    image: dduportal/bats:0.4.0
-    name: grafana-test
-    volumeMounts:
-    - mountPath: /tests
-      name: tests
-      readOnly: true
-    - mountPath: /tools
-      name: tools
-  initContainers:
-  - command:
-    - bash
-    - -c
-    - |
-      set -ex
-      # copy bats to tools dir
-      cp -R /usr/local/libexec/ /tools/bats/
-    image: dduportal/bats:0.4.0
-    name: test-framework
-    volumeMounts:
-    - mountPath: /tools
-      name: tools
-  restartPolicy: Never
-  serviceAccountName: grafana-test
-  volumes:
-  - configMap:
-      name: grafana-test
-    name: tests
-  - emptyDir: {}
-    name: tools
 
