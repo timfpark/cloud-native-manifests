@@ -1,10 +1,263 @@
 ---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+spec:
+  allowPrivilegeEscalation: true
+  fsGroup:
+    rule: RunAsAny
+  hostIPC: false
+  hostNetwork: false
+  hostPID: false
+  privileged: false
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - projected
+  - secret
+
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  annotations:
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: runtime/default
+    apparmor.security.beta.kubernetes.io/defaultProfileName: runtime/default
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: docker/default
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: docker/default
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+spec:
+  allowPrivilegeEscalation: false
+  fsGroup:
+    rule: RunAsAny
+  hostIPC: false
+  hostNetwork: false
+  hostPID: false
+  privileged: false
+  readOnlyRootFilesystem: false
+  requiredDropCapabilities:
+  - FOWNER
+  - FSETID
+  - KILL
+  - SETGID
+  - SETUID
+  - SETPCAP
+  - NET_BIND_SERVICE
+  - NET_RAW
+  - SYS_CHROOT
+  - MKNOD
+  - AUDIT_WRITE
+  - SETFCAP
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - configMap
+  - emptyDir
+  - projected
+  - secret
+  - downwardAPI
+  - persistentVolumeClaim
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana-clusterrole
+  namespace: grafana
+rules: []
+
+---
+apiVersion: v1
+data:
+  admin-password: SWtLbHRleGdjOW45dUNuNkZOQTJWVmNXZmJBZzlyMFdhdDdqd1FhNA==
+  admin-user: YWRtaW4=
+  ldap-toml: ""
+kind: Secret
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+type: Opaque
+
+---
+apiVersion: v1
+data:
+  dashboardproviders.yaml: |
+    apiVersion: 1
+    providers:
+    - disableDeletion: false
+      editable: true
+      folder: null
+      name: default
+      options:
+        path: /var/lib/grafana/dashboards/default
+      orgId: 1
+      type: file
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - access: proxy
+      isDefault: true
+      name: Prometheus
+      type: prometheus
+      url: http://prometheus-server.prometheus.svc.cluster.local
+  download_dashboards.sh: |
+    #!/usr/bin/env sh
+    set -euf
+    mkdir -p /var/lib/grafana/dashboards/default
+    curl -sk \
+    --connect-timeout 60 \
+    --max-time 60 \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json;charset=UTF-8" \https://grafana.com/api/dashboards/6417/revisions/1/download| sed 's|\"datasource\":[^,]*|\"datasource\": \"Prometheus\"|g'\
+    > /var/lib/grafana/dashboards/default/cluster-metrics.json
+    curl -sk \
+    --connect-timeout 60 \
+    --max-time 60 \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json;charset=UTF-8" \https://grafana.com/api/dashboards/6739/revisions/1/download| sed 's|\"datasource\":[^,]*|\"datasource\": \"Prometheus\"|g'\
+    > /var/lib/grafana/dashboards/default/persistent-volumes.json
+  grafana.ini: |
+    [analytics]
+    check_for_updates = true
+    [grafana_net]
+    url = https://grafana.net
+    [log]
+    mode = console
+    [paths]
+    data = /var/lib/grafana/data
+    logs = /var/log/grafana
+    plugins = /var/lib/grafana/plugins
+    provisioning = /etc/grafana/provisioning
+kind: ConfigMap
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+
+---
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    dashboard-provider: default
+    heritage: Tiller
+    release: grafana
+  name: grafana-dashboards-default
+  namespace: grafana
+
+---
+apiVersion: v1
+data:
+  run.sh: |-
+    @test "Test Health" {
+      url="http://grafana/api/health"
+
+      code=$(curl -s -o /dev/null -I -w "%{http_code}" $url)
+      [ "$code" == "200" ]
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: managed-premium
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana
+  namespace: grafana
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: grafana
+    chart: grafana-4.0.2
+    heritage: Tiller
+    release: grafana
+  name: grafana-test
+  namespace: grafana
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana
@@ -20,10 +273,10 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 506447867ce6173039f92f4136512857b21f5f4a9da0a96c75316f05d9316c1f
-        checksum/dashboards-json-config: 5c1ef0732ce797c93fb4c1875e810bd094e76c9bf2ef69c8813b18b02a29e59d
+        checksum/config: 29027d5a767fe44a80394771f269f5f94148d7008a85c0a55766c7293ccb819a
+        checksum/dashboards-json-config: 26cbe822214fad25e6fc78a5322c0787f45746fe006d7e1db5d60ca7fc9fb5e0
         checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/secret: d0d18211d3b09e3b2f5b9bef4c17c169f51b0e0ce2dcecf42421be75f3d4ff2f
+        checksum/secret: 7a7ffaf43776ca22266c0c80f1e69ccda1c576092dfaad468cae8a811df99909
       labels:
         app: grafana
         release: grafana
@@ -120,76 +373,12 @@ spec:
           claimName: grafana
 
 ---
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  annotations:
-    apparmor.security.beta.kubernetes.io/allowedProfileNames: runtime/default
-    apparmor.security.beta.kubernetes.io/defaultProfileName: runtime/default
-    seccomp.security.alpha.kubernetes.io/allowedProfileNames: docker/default
-    seccomp.security.alpha.kubernetes.io/defaultProfileName: docker/default
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-spec:
-  allowPrivilegeEscalation: false
-  fsGroup:
-    rule: RunAsAny
-  hostIPC: false
-  hostNetwork: false
-  hostPID: false
-  privileged: false
-  readOnlyRootFilesystem: false
-  requiredDropCapabilities:
-  - FOWNER
-  - FSETID
-  - KILL
-  - SETGID
-  - SETUID
-  - SETPCAP
-  - NET_BIND_SERVICE
-  - NET_RAW
-  - SYS_CHROOT
-  - MKNOD
-  - AUDIT_WRITE
-  - SETFCAP
-  runAsUser:
-    rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  volumes:
-  - configMap
-  - emptyDir
-  - projected
-  - secret
-  - downwardAPI
-  - persistentVolumeClaim
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-
----
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana
@@ -204,53 +393,45 @@ subjects:
   namespace: grafana
 
 ---
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
-  name: grafana-test
+  name: grafana-clusterrolebinding
   namespace: grafana
-spec:
-  allowPrivilegeEscalation: true
-  fsGroup:
-    rule: RunAsAny
-  hostIPC: false
-  hostNetwork: false
-  hostPID: false
-  privileged: false
-  runAsUser:
-    rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  volumes:
-  - configMap
-  - downwardAPI
-  - emptyDir
-  - projected
-  - secret
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: grafana-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: grafana
+  namespace: grafana
 
 ---
-apiVersion: v1
-data:
-  admin-password: UkxXb1dsbllSdlJUdDd4WEFSTUZzQ0VKcmR2bjNoNFpidXg4bEtVdA==
-  admin-user: YWRtaW4=
-  ldap-toml: ""
-kind: Secret
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
 metadata:
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana
   namespace: grafana
-type: Opaque
+rules:
+- apiGroups:
+  - extensions
+  resourceNames:
+  - grafana
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -258,7 +439,7 @@ kind: RoleBinding
 metadata:
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana-test
@@ -273,120 +454,25 @@ subjects:
   namespace: grafana
 
 ---
-apiVersion: v1
-kind: Service
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
 metadata:
   labels:
     app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-spec:
-  ports:
-  - name: service
-    port: 80
-    protocol: TCP
-    targetPort: 3000
-  selector:
-    app: grafana
-    release: grafana
-  type: ClusterIP
-
----
-apiVersion: v1
-data:
-  dashboardproviders.yaml: |
-    apiVersion: 1
-    providers:
-    - disableDeletion: false
-      editable: true
-      folder: null
-      name: default
-      options:
-        path: /var/lib/grafana/dashboards/default
-      orgId: 1
-      type: file
-  datasources.yaml: |
-    apiVersion: 1
-    datasources:
-    - access: proxy
-      isDefault: true
-      name: Prometheus
-      type: prometheus
-      url: http://prometheus-server.prometheus.svc.cluster.local
-  download_dashboards.sh: |
-    #!/usr/bin/env sh
-    set -euf
-    mkdir -p /var/lib/grafana/dashboards/default
-    curl -sk \
-    --connect-timeout 60 \
-    --max-time 60 \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json;charset=UTF-8" \https://grafana.com/api/dashboards/6417/revisions/1/download| sed 's|\"datasource\":[^,]*|\"datasource\": \"Prometheus\"|g'\
-    > /var/lib/grafana/dashboards/default/cluster-metrics.json
-    curl -sk \
-    --connect-timeout 60 \
-    --max-time 60 \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json;charset=UTF-8" \https://grafana.com/api/dashboards/6739/revisions/1/download| sed 's|\"datasource\":[^,]*|\"datasource\": \"Prometheus\"|g'\
-    > /var/lib/grafana/dashboards/default/persistent-volumes.json
-  grafana.ini: |
-    [analytics]
-    check_for_updates = true
-    [grafana_net]
-    url = https://grafana.net
-    [log]
-    mode = console
-    [paths]
-    data = /var/lib/grafana/data
-    logs = /var/log/grafana
-    plugins = /var/lib/grafana/plugins
-    provisioning = /etc/grafana/provisioning
-kind: ConfigMap
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-
----
-apiVersion: v1
-data: {}
-kind: ConfigMap
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    dashboard-provider: default
-    heritage: Tiller
-    release: grafana
-  name: grafana-dashboards-default
-  namespace: grafana
-
----
-apiVersion: v1
-data:
-  run.sh: |-
-    @test "Test Health" {
-      url="http://grafana/api/health"
-
-      code=$(curl -s -o /dev/null -I -w "%{http_code}" $url)
-      [ "$code" == "200" ]
-    }
-kind: ConfigMap
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana-test
   namespace: grafana
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - grafana-test
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
 
 ---
 apiVersion: v1
@@ -396,7 +482,7 @@ metadata:
     helm.sh/hook: test-success
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana-test
@@ -439,109 +525,23 @@ spec:
 
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: Service
 metadata:
-  finalizers:
-  - kubernetes.io/pvc-protection
   labels:
     app: grafana
-    chart: grafana-4.0.1
+    chart: grafana-4.0.2
     heritage: Tiller
     release: grafana
   name: grafana
   namespace: grafana
 spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  storageClassName: managed-premium
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  labels:
+  ports:
+  - name: service
+    port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
     app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
     release: grafana
-  name: grafana-clusterrole
-  namespace: grafana
-rules: []
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-clusterrolebinding
-  namespace: grafana
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: grafana-clusterrole
-subjects:
-- kind: ServiceAccount
-  name: grafana
-  namespace: grafana
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana-test
-  namespace: grafana
-rules:
-- apiGroups:
-  - policy
-  resourceNames:
-  - grafana-test
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: Role
-metadata:
-  labels:
-    app: grafana
-    chart: grafana-4.0.1
-    heritage: Tiller
-    release: grafana
-  name: grafana
-  namespace: grafana
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - grafana
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
+  type: ClusterIP
 

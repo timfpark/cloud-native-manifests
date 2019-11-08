@@ -1,16 +1,88 @@
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   labels:
     app: prometheus
     chart: prometheus-9.3.1
-    component: pushgateway
+    component: server
     heritage: Tiller
     release: prometheus
-  name: prometheus-pushgateway
+  name: prometheus-server
   namespace: prometheus
-rules: null
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+      component: server
+      release: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        chart: prometheus-9.3.1
+        component: server
+        heritage: Tiller
+        release: prometheus
+    spec:
+      containers:
+      - args:
+        - --volume-dir=/etc/config
+        - --webhook-url=http://127.0.0.1:9090/-/reload
+        image: jimmidyson/configmap-reload:v0.2.2
+        imagePullPolicy: IfNotPresent
+        name: prometheus-server-configmap-reload
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config-volume
+          readOnly: true
+      - args:
+        - --storage.tsdb.retention.time=15d
+        - --config.file=/etc/config/prometheus.yml
+        - --storage.tsdb.path=/data
+        - --web.console.libraries=/etc/prometheus/console_libraries
+        - --web.console.templates=/etc/prometheus/consoles
+        - --web.enable-lifecycle
+        image: prom/prometheus:v2.13.1
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+        name: prometheus-server
+        ports:
+        - containerPort: 9090
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config-volume
+        - mountPath: /data
+          name: storage-volume
+          subPath: ""
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: prometheus-server
+      terminationGracePeriodSeconds: 300
+      volumes:
+      - configMap:
+          name: prometheus-server
+        name: config-volume
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: prometheus-server
 
 ---
 apiVersion: v1
@@ -1006,6 +1078,221 @@ metadata:
   namespace: prometheus
 
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: alertmanager
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-alertmanager
+  namespace: prometheus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: managed-premium
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: server
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-server
+  namespace: prometheus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Gi
+  storageClassName: managed-premium
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: alertmanager
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-alertmanager
+  namespace: prometheus
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: kube-state-metrics
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-kube-state-metrics
+  namespace: prometheus
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: node-exporter
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-node-exporter
+  namespace: prometheus
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: pushgateway
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-pushgateway
+  namespace: prometheus
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: server
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-server
+  namespace: prometheus
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: alertmanager
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-alertmanager
+  namespace: prometheus
+rules: null
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: kube-state-metrics
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-kube-state-metrics
+  namespace: prometheus
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  - persistentvolumeclaims
+  - pods
+  - services
+  - resourcequotas
+  - replicationcontrollers
+  - limitranges
+  - persistentvolumeclaims
+  - persistentvolumes
+  - endpoints
+  - secrets
+  - configmaps
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - ingresses
+  - replicasets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - list
+  - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-9.3.1
+    component: pushgateway
+    heritage: Tiller
+    release: prometheus
+  name: prometheus-pushgateway
+  namespace: prometheus
+rules: null
+
+---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
@@ -1325,89 +1612,6 @@ metadata:
   labels:
     app: prometheus
     chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: prometheus
-      component: alertmanager
-      release: prometheus
-  template:
-    metadata:
-      labels:
-        app: prometheus
-        chart: prometheus-9.3.1
-        component: alertmanager
-        heritage: Tiller
-        release: prometheus
-    spec:
-      containers:
-      - args:
-        - --config.file=/etc/config/alertmanager.yml
-        - --storage.path=/data
-        - --cluster.advertise-address=$(POD_IP):6783
-        - --web.external-url=/
-        env:
-        - name: POD_IP
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: status.podIP
-        image: prom/alertmanager:v0.18.0
-        imagePullPolicy: IfNotPresent
-        name: prometheus-alertmanager
-        ports:
-        - containerPort: 9093
-        readinessProbe:
-          httpGet:
-            path: /#/status
-            port: 9093
-          initialDelaySeconds: 30
-          timeoutSeconds: 30
-        resources: {}
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config-volume
-        - mountPath: /data
-          name: storage-volume
-          subPath: ""
-      - args:
-        - --volume-dir=/etc/config
-        - --webhook-url=http://127.0.0.1:9093/-/reload
-        image: jimmidyson/configmap-reload:v0.2.2
-        imagePullPolicy: IfNotPresent
-        name: prometheus-alertmanager-configmap-reload
-        resources: {}
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config-volume
-          readOnly: true
-      securityContext:
-        fsGroup: 65534
-        runAsGroup: 65534
-        runAsNonRoot: true
-        runAsUser: 65534
-      serviceAccountName: prometheus-alertmanager
-      volumes:
-      - configMap:
-          name: prometheus-alertmanager
-        name: config-volume
-      - name: storage-volume
-        persistentVolumeClaim:
-          claimName: prometheus-alertmanager
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
     component: kube-state-metrics
     heritage: Tiller
     release: prometheus
@@ -1490,268 +1694,54 @@ spec:
       serviceAccountName: prometheus-pushgateway
 
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: node-exporter
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-node-exporter
-  namespace: prometheus
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 4Gi
-  storageClassName: managed-premium
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: server
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-server
-  namespace: prometheus
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 64Gi
-  storageClassName: managed-premium
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: kube-state-metrics
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-kube-state-metrics
-  namespace: prometheus
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: server
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-server
-  namespace: prometheus
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: pushgateway
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-pushgateway
-  namespace: prometheus
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: alertmanager
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-alertmanager
-  namespace: prometheus
-rules: null
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    app: prometheus
-    chart: prometheus-9.3.1
-    component: kube-state-metrics
-    heritage: Tiller
-    release: prometheus
-  name: prometheus-kube-state-metrics
-  namespace: prometheus
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  - nodes
-  - persistentvolumeclaims
-  - pods
-  - services
-  - resourcequotas
-  - replicationcontrollers
-  - limitranges
-  - persistentvolumeclaims
-  - persistentvolumes
-  - endpoints
-  - secrets
-  - configmaps
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - extensions
-  resources:
-  - daemonsets
-  - deployments
-  - ingresses
-  - replicasets
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - batch
-  resources:
-  - cronjobs
-  - jobs
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - policy
-  resources:
-  - poddisruptionbudgets
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests
-  verbs:
-  - list
-  - watch
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app: prometheus
     chart: prometheus-9.3.1
-    component: server
+    component: alertmanager
     heritage: Tiller
     release: prometheus
-  name: prometheus-server
+  name: prometheus-alertmanager
   namespace: prometheus
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: prometheus
-      component: server
+      component: alertmanager
       release: prometheus
   template:
     metadata:
       labels:
         app: prometheus
         chart: prometheus-9.3.1
-        component: server
+        component: alertmanager
         heritage: Tiller
         release: prometheus
     spec:
       containers:
       - args:
-        - --volume-dir=/etc/config
-        - --webhook-url=http://127.0.0.1:9090/-/reload
-        image: jimmidyson/configmap-reload:v0.2.2
+        - --config.file=/etc/config/alertmanager.yml
+        - --storage.path=/data
+        - --cluster.advertise-address=$(POD_IP):6783
+        - --web.external-url=/
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        image: prom/alertmanager:v0.18.0
         imagePullPolicy: IfNotPresent
-        name: prometheus-server-configmap-reload
-        resources: {}
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config-volume
-          readOnly: true
-      - args:
-        - --storage.tsdb.retention.time=15d
-        - --config.file=/etc/config/prometheus.yml
-        - --storage.tsdb.path=/data
-        - --web.console.libraries=/etc/prometheus/console_libraries
-        - --web.console.templates=/etc/prometheus/consoles
-        - --web.enable-lifecycle
-        image: prom/prometheus:v2.13.1
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          httpGet:
-            path: /-/healthy
-            port: 9090
-          initialDelaySeconds: 30
-          timeoutSeconds: 30
-        name: prometheus-server
+        name: prometheus-alertmanager
         ports:
-        - containerPort: 9090
+        - containerPort: 9093
         readinessProbe:
           httpGet:
-            path: /-/ready
-            port: 9090
+            path: /#/status
+            port: 9093
           initialDelaySeconds: 30
           timeoutSeconds: 30
         resources: {}
@@ -1761,18 +1751,28 @@ spec:
         - mountPath: /data
           name: storage-volume
           subPath: ""
+      - args:
+        - --volume-dir=/etc/config
+        - --webhook-url=http://127.0.0.1:9093/-/reload
+        image: jimmidyson/configmap-reload:v0.2.2
+        imagePullPolicy: IfNotPresent
+        name: prometheus-alertmanager-configmap-reload
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config-volume
+          readOnly: true
       securityContext:
         fsGroup: 65534
         runAsGroup: 65534
         runAsNonRoot: true
         runAsUser: 65534
-      serviceAccountName: prometheus-server
-      terminationGracePeriodSeconds: 300
+      serviceAccountName: prometheus-alertmanager
       volumes:
       - configMap:
-          name: prometheus-server
+          name: prometheus-alertmanager
         name: config-volume
       - name: storage-volume
         persistentVolumeClaim:
-          claimName: prometheus-server
+          claimName: prometheus-alertmanager
 
