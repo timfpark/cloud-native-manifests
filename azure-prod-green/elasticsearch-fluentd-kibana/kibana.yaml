@@ -1,22 +1,4 @@
 ---
-apiVersion: v1
-data:
-  kibana.yml: |
-    elasticsearch.hosts: http://elasticsearch:9200
-    elasticsearch.url: http://elasticsearch-client.elasticsearch.svc.cluster.local:9200
-    server.host: "0"
-    server.name: kibana
-kind: ConfigMap
-metadata:
-  labels:
-    app: kibana
-    chart: kibana-3.2.4
-    heritage: Tiller
-    release: kibana
-  name: kibana
-  namespace: kibana
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -65,7 +47,13 @@ spec:
 
 ---
 apiVersion: v1
-kind: Service
+data:
+  kibana.yml: |
+    elasticsearch.hosts: http://elasticsearch:9200
+    elasticsearch.url: http://elasticsearch-client.elasticsearch.svc.cluster.local:9200
+    server.host: "0"
+    server.name: kibana
+kind: ConfigMap
 metadata:
   labels:
     app: kibana
@@ -74,15 +62,6 @@ metadata:
     release: kibana
   name: kibana
   namespace: kibana
-spec:
-  ports:
-  - port: 443
-    protocol: TCP
-    targetPort: 5601
-  selector:
-    app: kibana
-    release: kibana
-  type: ClusterIP
 
 ---
 apiVersion: v1
@@ -116,6 +95,27 @@ metadata:
     release: kibana
   name: kibana-test
   namespace: kibana
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kibana
+    chart: kibana-3.2.4
+    heritage: Tiller
+    release: kibana
+  name: kibana
+  namespace: kibana
+spec:
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 5601
+  selector:
+    app: kibana
+    release: kibana
+  type: ClusterIP
 
 ---
 apiVersion: v1

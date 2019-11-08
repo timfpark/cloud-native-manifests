@@ -209,29 +209,6 @@ metadata:
 
 ---
 apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    component: client
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-client
-  namespace: elasticsearch
-spec:
-  ports:
-  - name: http
-    port: 9200
-    targetPort: http
-  selector:
-    app: elasticsearch
-    component: client
-    release: elasticsearch
-  type: ClusterIP
-
----
-apiVersion: v1
 data:
   run.sh: |-
     @test "Test Access and Health" {
@@ -250,16 +227,25 @@ metadata:
 
 ---
 apiVersion: v1
-kind: ServiceAccount
+kind: Service
 metadata:
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
-    component: client
+    component: master
     heritage: Tiller
     release: elasticsearch
-  name: elasticsearch-client
+  name: elasticsearch-discovery
   namespace: elasticsearch
+spec:
+  clusterIP: None
+  ports:
+  - port: 9300
+    targetPort: transport
+  selector:
+    app: elasticsearch
+    component: master
+    release: elasticsearch
 
 ---
 apiVersion: v1
@@ -289,73 +275,26 @@ metadata:
 
 ---
 apiVersion: v1
-kind: Pod
-metadata:
-  annotations:
-    helm.sh/hook: test-success
-  labels:
-    app: elasticsearch
-    chart: elasticsearch-1.32.0
-    heritage: Tiller
-    release: elasticsearch
-  name: elasticsearch-test
-  namespace: elasticsearch
-spec:
-  containers:
-  - command:
-    - /tools/bats/bats
-    - -t
-    - /tests/run.sh
-    image: dduportal/bats:0.4.0
-    name: elasticsearch-test
-    volumeMounts:
-    - mountPath: /tests
-      name: tests
-      readOnly: true
-    - mountPath: /tools
-      name: tools
-  initContainers:
-  - command:
-    - bash
-    - -c
-    - |
-      set -ex
-      # copy bats to tools dir
-      cp -R /usr/local/libexec/ /tools/bats/
-    image: dduportal/bats:0.4.0
-    name: test-framework
-    volumeMounts:
-    - mountPath: /tools
-      name: tools
-  restartPolicy: Never
-  volumes:
-  - configMap:
-      name: elasticsearch-test
-    name: tests
-  - emptyDir: {}
-    name: tools
-
----
-apiVersion: v1
 kind: Service
 metadata:
   labels:
     app: elasticsearch
     chart: elasticsearch-1.32.0
-    component: master
+    component: client
     heritage: Tiller
     release: elasticsearch
-  name: elasticsearch-discovery
+  name: elasticsearch-client
   namespace: elasticsearch
 spec:
-  clusterIP: None
   ports:
-  - port: 9300
-    targetPort: transport
+  - name: http
+    port: 9200
+    targetPort: http
   selector:
     app: elasticsearch
-    component: master
+    component: client
     release: elasticsearch
+  type: ClusterIP
 
 ---
 apiVersion: apps/v1
@@ -459,6 +398,54 @@ spec:
       - configMap:
           name: elasticsearch
         name: config
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    helm.sh/hook: test-success
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-test
+  namespace: elasticsearch
+spec:
+  containers:
+  - command:
+    - /tools/bats/bats
+    - -t
+    - /tests/run.sh
+    image: dduportal/bats:0.4.0
+    name: elasticsearch-test
+    volumeMounts:
+    - mountPath: /tests
+      name: tests
+      readOnly: true
+    - mountPath: /tools
+      name: tools
+  initContainers:
+  - command:
+    - bash
+    - -c
+    - |
+      set -ex
+      # copy bats to tools dir
+      cp -R /usr/local/libexec/ /tools/bats/
+    image: dduportal/bats:0.4.0
+    name: test-framework
+    volumeMounts:
+    - mountPath: /tools
+      name: tools
+  restartPolicy: Never
+  volumes:
+  - configMap:
+      name: elasticsearch-test
+    name: tests
+  - emptyDir: {}
+    name: tools
 
 ---
 apiVersion: apps/v1
@@ -602,4 +589,17 @@ spec:
         requests:
           storage: 64Gi
       storageClassName: managed-premium
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: elasticsearch
+    chart: elasticsearch-1.32.0
+    component: client
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-client
+  namespace: elasticsearch
 

@@ -101,66 +101,6 @@ spec:
     type: RollingUpdate
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
-  name: fluentd-elasticsearch
-  namespace: fluentd
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  - pods
-  verbs:
-  - get
-  - watch
-  - list
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
-  name: fluentd-elasticsearch
-  namespace: fluentd
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile
-    app.kubernetes.io/instance: fluentd-elasticsearch
-    app.kubernetes.io/managed-by: Tiller
-    app.kubernetes.io/name: fluentd-elasticsearch
-    helm.sh/chart: fluentd-elasticsearch-2.0.7
-    kubernetes.io/cluster-service: "true"
-  name: fluentd-elasticsearch
-  namespace: fluentd
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: fluentd-elasticsearch
-subjects:
-- kind: ServiceAccount
-  name: fluentd-elasticsearch
-  namespace: fluentd
-
----
 apiVersion: v1
 data:
   containers.input.conf: |-
@@ -560,6 +500,66 @@ metadata:
     app.kubernetes.io/name: fluentd-elasticsearch
     helm.sh/chart: fluentd-elasticsearch-2.0.7
     kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    app.kubernetes.io/instance: fluentd-elasticsearch
+    app.kubernetes.io/managed-by: Tiller
+    app.kubernetes.io/name: fluentd-elasticsearch
+    helm.sh/chart: fluentd-elasticsearch-2.0.7
+    kubernetes.io/cluster-service: "true"
+  name: fluentd-elasticsearch
+  namespace: fluentd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentd-elasticsearch
+subjects:
+- kind: ServiceAccount
   name: fluentd-elasticsearch
   namespace: fluentd
 
